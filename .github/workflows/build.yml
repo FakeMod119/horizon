@@ -1,0 +1,37 @@
+
+name: Build Horizon Offline Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: launcher
+
+      - name: Build Horizon Release
+        working-directory: launcher
+        run: cargo build --release
+
+      - name: Upload Windows EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: Horizon-Offline-Windows
+          path: |
+            launcher/target/release/*.exe
+            target/release/*.exe
+          if-no-files-found: error
