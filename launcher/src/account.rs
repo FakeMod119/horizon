@@ -1824,7 +1824,7 @@ impl Accounts {
         self.play_as_with(store, who, false)
     }
 
-    /// [`Self::play_as`], where `offline_without_owner` (the window's hidden developer option,
+    /// [`Self::play_as`], where `offline_without_owner` (the visible offline play option,
     /// `backend::Settings::dev_offline`) lets an offline name play without an account that owns
     /// the game.
     pub fn play_as_with(
@@ -2087,10 +2087,10 @@ pub fn launch(
     }
 }
 
-/// The owner gate before the game starts. With the window's hidden developer option
-/// (`backend::Settings::dev_offline`, `offline_without_owner`) no owner is no refusal: the game
-/// starts offline, without a session and without an `owner`. Downloads never come through here:
-/// `backend::download_for_owner` asks [`launch`] itself, so the option never downloads the game.
+/// The owner gate before the game starts. With the offline option enabled, offline names
+/// and the game's own name start without contacting Microsoft. A selected Microsoft account
+/// still uses its real session if available. Downloads never come through this option:
+/// `backend::download_for_owner` asks [`launch`] itself, so it never downloads without an owner.
 pub fn launch_for_game(
     ep: &Endpoints,
     client_id: Option<&str>,
@@ -2098,6 +2098,11 @@ pub fn launch_for_game(
     accounts: &mut Accounts,
     offline_without_owner: bool,
 ) -> Result<Launch, NoOwner> {
+    // Local single-player and LAN must work without a network even when an old Microsoft
+    // account remains saved in this launcher. Do not refresh or inspect it in this mode.
+    if offline_without_owner && !matches!(accounts.player(), Player::Microsoft(_)) {
+        return Ok(Launch::default());
+    }
     match launch(ep, client_id, store, accounts) {
         Err(NoOwner { .. }) if offline_without_owner => Ok(Launch::default()),
         pass => pass,
@@ -2351,11 +2356,16 @@ pub fn session_for_game(
         &mut accounts,
         offline_without_owner,
     )?;
-    let env = split_sessions(
-        game_home,
-        &mut accounts,
-        pass.session.as_ref().map(|(a, _)| a.uuid.as_str()),
-    );
+    // An explicitly offline launch never refreshes other players' Microsoft sessions.
+    let env = if offline_without_owner && pass.session.is_none() {
+        Vec::new()
+    } else {
+        split_sessions(
+            game_home,
+            &mut accounts,
+            pass.session.as_ref().map(|(a, _)| a.uuid.as_str()),
+        )
+    };
     if let Err(e) = accounts.save() {
         eprintln!("Horizon: the accounts are not saved: {e}");
     }

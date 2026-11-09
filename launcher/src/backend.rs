@@ -3189,13 +3189,14 @@ pub fn client_as(tag: &str, who: Option<&account::Player>) -> Result<Command, St
     play_step("reading the sign-in");
     let hint = |refused: String| format!("{refused} {}", crate::i18n::tr(SIGN_IN_HINT));
     let session = match who {
-        None => account::session_for_game(&game_home(), false).map_err(|refused| {
-            // A keyring that didn't answer isn't a missing sign-in (#12179).
-            match refused.keyring {
-                Some(why) => why,
-                None => hint(refused.to_string()),
-            }
-        }),
+        None => account::session_for_game(&game_home(), Settings::load().dev_offline)
+            .map_err(|refused| {
+                // A keyring that didn't answer isn't a missing sign-in (#12179).
+                match refused.keyring {
+                    Some(why) => why,
+                    None => hint(refused.to_string()),
+                }
+            }),
         Some(who) => account::session_for_game_as(&game_home(), who).map_err(hint),
     }?;
     if let Err(e) = need_prepared(tag) {
@@ -4519,12 +4520,18 @@ pub struct Settings {
     /// An older file's switch for the release profile, read when `native_profile` is unset.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub native_release: bool,
-    /// Developer options (hidden: seven clicks on the sidebar's launcher version reveal them):
-    /// offline names play without an account that owns the game, in the window only
-    /// (`account::Accounts::play_as_with`, `account::launch_for_game`). Never a download: the game still
-    /// comes from the player's own install. Off by default, and absent from the file while off.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    /// Offline play without Microsoft sign-in. Enabled by default in this fork for both the
+    /// window and CLI; setting false restores the original account gate. The existing key name
+    /// is preserved for compatibility with previously saved launcher settings.
+    /// This never permits Minecraft downloads without an owning account: use the files from
+    /// your own local Minecraft install (or already-prepared Horizon resources).
+    #[serde(default = "offline_enabled_by_default")]
     pub dev_offline: bool,
+}
+
+/// Used for settings.json that predates the offline option. An explicit false is preserved.
+fn offline_enabled_by_default() -> bool {
+    true
 }
 
 impl Settings {
@@ -4533,7 +4540,9 @@ impl Settings {
     }
     pub fn parse(text: &str) -> Self {
         let Ok(mut value) = serde_json::from_str::<serde_json::Value>(text) else {
-            return Self::default();
+            let mut defaults = Self::default();
+            defaults.dev_offline = offline_enabled_by_default();
+            return defaults;
         };
         if let Some(fields) = value.as_object_mut() {
             // An appearance from a newer launcher is Dark, not a reason to lose every setting.
@@ -5451,6 +5460,19 @@ pub fn {f}("
         assert_eq!(split_args("--name My\\ World"), ["--name", "My World"]);
         assert_eq!(split_args("a\\tb c"), ["atb", "c"]);
         assert_eq!(split_args("\"a\\\"b\" 'c\\d'"), ["a\"b", "c\\d"]);
+    }
+
+    #[test]
+    fn offline_play_is_on_by_default_and_can_be_disabled_persistently() {
+        assert!(Settings::parse("").dev_offline);
+        assert!(Settings::parse("{}").dev_offline);
+        assert!(Settings::parse(r#"{"selected":"v0.2.0"}"#).dev_offline);
+        let off = Settings::parse(r#"{"dev_offline":false}"#);
+        assert!(!off.dev_offline);
+        let saved = serde_json::to_string(&off).unwrap();
+        assert_eq!(Settings::parse(&saved).dev_offline, false);
+        let on = Settings::parse(r#"{"dev_offline":true}"#);
+        assert!(Settings::parse(&serde_json::to_string(&on).unwrap()).dev_offline);
     }
 
     #[test]

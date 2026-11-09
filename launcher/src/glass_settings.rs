@@ -397,7 +397,9 @@ impl Launcher {
     fn glass_settings_sections(&mut self, b: Built, cx: &mut Context<Self>) -> Vec<Div> {
         let t = self.theme;
         let n = 0;
-        let account = card().child(self.glass_account(cx));
+        let account = card()
+            .child(self.glass_account(cx))
+            .children(self.dev_options_section(cx));
         let updates = card()
             .child(self.update_tiles(b.horizon, b.horizon_action, b.launcher, b.launcher_action))
             .child(index_row(
@@ -504,8 +506,7 @@ impl Launcher {
                     Some(b.menu_entry.into_any_element()),
                     &t,
                 ))
-            })
-            .children(self.dev_options_section(cx));
+            });
         let data = card().child(self.collection_section(cx));
         vec![account, updates, launcher, network, game, ai, about, data]
     }

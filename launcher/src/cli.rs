@@ -128,9 +128,9 @@ enum AccountCmd {
     },
     /// Play as this account, or as one of your offline names
     Select { who: String },
-    /// Play offline (LAN, offline-mode servers) beside a signed-in account that owns the game:
-    /// as NAME (kept to switch back to; 3 to 16 letters, digits or _), or as the name the game
-    /// made up
+    /// Play offline (single-player, LAN, offline-mode servers) without Microsoft sign-in
+    /// when the offline setting is enabled: as NAME (3 to 16 letters, digits or _), or as
+    /// the name the game made up. Online-mode servers still require authentication.
     Offline { name: Option<String> },
     /// Forget one of your offline names; its skin and cape go with it
     ForgetOffline { name: String },
@@ -1977,7 +1977,7 @@ fn account_command(action: AccountCmd, as_json: bool) -> Result<(), String> {
                         "Playing offline as the game's own name (`account select NAME` to switch)."
                     );
                 }
-                if !accounts.has_owner(account::store()) {
+                if !backend::Settings::load().dev_offline && !accounts.has_owner(account::store()) {
                     println!(
                         "{} {}",
                         account::NoOwner::default(),
@@ -2073,7 +2073,11 @@ fn account_command(action: AccountCmd, as_json: bool) -> Result<(), String> {
                 ),
                 (None, None) => return Err(find(&accounts, &who).unwrap_err()),
             };
-            accounts.play_as(account::store(), player)?;
+            accounts.play_as_with(
+                account::store(),
+                player,
+                backend::Settings::load().dev_offline,
+            )?;
             accounts.save()?;
             println!("The game plays as {name}.");
         }
@@ -2082,7 +2086,11 @@ fn account_command(action: AccountCmd, as_json: bool) -> Result<(), String> {
                 Some(n) => account::Player::Offline(n),
                 None => account::Player::GameName,
             };
-            accounts.play_as(account::store(), player)?;
+            accounts.play_as_with(
+                account::store(),
+                player,
+                backend::Settings::load().dev_offline,
+            )?;
             accounts.save()?;
             match accounts.name_arg() {
                 Some(n) => println!("The game plays offline as {n}."),

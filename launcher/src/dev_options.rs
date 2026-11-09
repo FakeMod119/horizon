@@ -1,8 +1,6 @@
-//! Developer options: a Settings section nothing in the window points to. Seven clicks on the
-//! sidebar's "Launcher x.y.z" reveal it for this run; it stays shown while one of its options is
-//! on. Its one option lets offline names play without an account that owns the game
-//! (`backend::Settings::dev_offline`). The game still comes from the player's own install: the
-//! launcher downloads Mojang's files only for an owner (`backend::download_for_owner`).
+//! Offline play control on Settings > Account. The original dev_offline setting and owner
+//! gate fallback are reused; this fork makes them visible and enabled by default. Minecraft
+//! resources must already be available from the player's local installation or preparation.
 use super::*;
 
 /// Clicks on the launcher's version that reveal the section.
@@ -21,11 +19,8 @@ impl Launcher {
         }
     }
 
-    /// The section, when revealed or when one of its options is on.
+    /// Always-visible offline-mode setting (also present in the Glass look).
     pub(super) fn dev_options_section(&self, cx: &mut Context<Self>) -> Option<Div> {
-        if !self.dev_options && !self.settings.dev_offline {
-            return None;
-        }
         let t = self.theme;
         let toggle = switch("dev-offline", self.settings.dev_offline, &t).on_click(cx.listener(
             |this, _: &ClickEvent, _, cx| {
@@ -39,7 +34,7 @@ impl Launcher {
                 .flex()
                 .flex_col()
                 .child(
-                    section_title("Developer options", "terminal", &t)
+                    section_title("Offline play", "terminal", &t)
                         .mt(px(20.))
                         .mb(px(12.)),
                 )

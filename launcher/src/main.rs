@@ -4054,6 +4054,7 @@ impl Launcher {
                     .child(group("Account", "user").mt_0())
                     .child(accounts)
                     .child(offline)
+                    .children(self.dev_options_section(cx))
                     .child(group("Updates", "reload"))
                     .child(index_row(n + 1, "Horizon", Some(plain(&horizon)), horizon_action, &t))
                     .child(index_row(
@@ -4150,7 +4151,6 @@ impl Launcher {
             )
             .child(self.collection_section(cx))
             .children(self.agents_section(cx))
-            .children(self.dev_options_section(cx))
     }
 
     /// The warning before a native build: what the mods can do and which mods. The build starts
