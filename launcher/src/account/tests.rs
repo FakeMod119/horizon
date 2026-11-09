@@ -750,7 +750,18 @@ fn the_developer_option_plays_offline_names_without_an_owner() {
         .unwrap();
     let pass = launch_for_game(&ep, Some("test-client"), &store, &mut accounts, true).unwrap();
     assert!(pass.session.is_none() && pass.owner.is_none());
-    assert!(!accounts.has_owner(&store));
+    // The local launch does not modify the saved Microsoft ownership state.
+    assert!(accounts.has_owner(&store));
+    // Even with a saved owning account, selecting a local name never queries Microsoft.
+    let (m, ep) = mock(|_| {});
+    let mut accounts = signed_in(&store, &secrets("mc-token", true));
+    accounts
+        .play_as_with(&store, Player::Offline("Builder_1".into()), true)
+        .unwrap();
+    let pass = launch_for_game(&ep, Some("test-client"), &store, &mut accounts, true).unwrap();
+    assert!(pass.owner.is_none() && pass.session.is_none());
+    assert!(m.lock().unwrap().log.is_empty());
+
     // A real owner is still found and brings what it brings without the option.
     let (_, ep) = mock(|_| {});
     let mut accounts = signed_in(&store, &secrets("mc-token", true));
